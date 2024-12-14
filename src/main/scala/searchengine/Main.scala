@@ -5,7 +5,6 @@ import org.apache.spark.rdd.RDD
 import org.apache.log4j._
 import org.apache.log4j.varia.NullAppender
 
-import java.io.PrintWriter
 import org.apache.log4j.{Level, Logger}
 
 object Main {
@@ -92,7 +91,7 @@ object Main {
         }
         .sortByKey()
 
-    val content = invertedIndex
+    invertedIndex
       .map { case (word, (count, docs)) =>
         val docsFormatted = docs
           .map { case (doc, positions) =>
@@ -101,13 +100,7 @@ object Main {
           .mkString(", ")
         s"$word, $count, [$docsFormatted]"
       }
-      .collect()
-      .mkString("\n")
-
-    new PrintWriter("output/wholeInvertedIndex.txt") {
-      write(content)
-      close()
-    }
+      .saveAsTextFile("output/wholeInvertedIndex.txt")
 
     val mongodbAnalyzer = new MongodbAnalyzer(spark)
     mongodbAnalyzer.processAndSave(invertedIndex)
