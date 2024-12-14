@@ -41,7 +41,7 @@ object Comparison {
     // Mongo
     val mongoAnalyze = new MongodbAnalyzer(spark)
 
-    val queries = List("play soccer")
+    val queries = List("play soccer", "play football", "play cricket", "soccer")
     val headers =
       Seq("Query", "RDD Time", "Mongo Time", "Mongo Result", "RDD Result")
 
@@ -80,7 +80,8 @@ object TableFormatter {
       row
         .zip(columnWidths)
         .map { case (cell, width) =>
-          cell.padTo(width, ' ')
+          val trimmedCell = if (cell.length > 30) cell.take(20) + "..." else cell
+          trimmedCell.padTo(width, ' ')
         }
         .mkString("|", "|", "|")
 
