@@ -1,0 +1,1 @@
+docker exec hello-world-template-spark-master-1 spark-submit --class Main --master spark://spark-master:7077  /opt/spark/target/scala-2.12/sparkscalaapp_2.12-1.0.jar
