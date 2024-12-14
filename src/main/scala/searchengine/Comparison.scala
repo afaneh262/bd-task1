@@ -3,6 +3,7 @@ package searchengine
 import org.apache.spark.sql.{SparkSession}
 import org.apache.log4j._
 import org.apache.log4j.varia.NullAppender
+import TextUtils._
 
 object Comparison {
   def main(args: Array[String]): Unit = {
@@ -41,26 +42,41 @@ object Comparison {
     // Mongo
     val mongoAnalyze = new MongodbAnalyzer(spark)
 
-    val queries = List("play soccer", "play football", "play cricket", "soccer")
+    val queries = List(
+      "play soccer",
+      "play football",
+      "play cricket",
+      "soccer",
+      "Tobias Gregson Shows What He Can Do",
+      "Alkali Plain",
+      "Avenging Angels",
+      "flourishing distilleries"
+    )
     val headers =
       Seq("Query", "RDD Time", "Mongo Time", "Mongo Result", "RDD Result")
 
     val rows = queries.map { query =>
-      val startRDD = System.nanoTime()
-      val rddResults = rddAnalyzer.searchQuery(query)
-      val rddTime = System.nanoTime() - startRDD
+      val validationResult = isValidWord(query)
+      if (validationResult.isValid) {
+        val startRDD = System.nanoTime()
+        val rddResults = rddAnalyzer.searchQuery(validationResult.result)
+        val rddTime = System.nanoTime() - startRDD
 
-      val startMongo = System.nanoTime()
-      val mongoResults = mongoAnalyze.searchQuery(query)
-      val mongoTime = System.nanoTime() - startMongo
+        val startMongo = System.nanoTime()
+        val mongoResults = mongoAnalyze.searchQuery(validationResult.result)
+        val mongoTime = System.nanoTime() - startMongo
 
-      Seq(
-        query,
-        formatTime(rddTime),
-        formatTime(mongoTime),
-        formatResults(mongoResults),
-        formatResults(rddResults)
-      )
+        Seq(
+          validationResult.result,
+          formatTime(rddTime),
+          formatTime(mongoTime),
+          formatResults(mongoResults),
+          formatResults(rddResults)
+        )
+      } else {
+        println("hit invalid qiuery")
+        Seq(query, "N/A", "N/A", "N/A", "N/A")
+      }
     }
 
     println(TableFormatter.formatTable(headers, rows))
@@ -80,7 +96,8 @@ object TableFormatter {
       row
         .zip(columnWidths)
         .map { case (cell, width) =>
-          val trimmedCell = if (cell.length > 30) cell.take(20) + "..." else cell
+          val trimmedCell =
+            if (cell.length > 30) cell.take(20) + "..." else cell
           trimmedCell.padTo(width, ' ')
         }
         .mkString("|", "|", "|")
