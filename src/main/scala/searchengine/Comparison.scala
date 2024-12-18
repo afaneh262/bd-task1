@@ -4,17 +4,19 @@ import org.apache.spark.sql.{SparkSession}
 import org.apache.log4j._
 import org.apache.log4j.varia.NullAppender
 import TextUtils._
+import org.apache.log4j.{Level, Logger}
 
 object Comparison {
   def main(args: Array[String]): Unit = {
     val nullAppender = new NullAppender
     BasicConfigurator.configure(nullAppender)
 
+    Logger.getRootLogger.setLevel(Level.OFF)
+
     // Initialize Spark Session
     val spark = SparkSession
       .builder()
       .appName("Task-1")
-      // .master("spark://spark-master:7077")
       .master("local[*]")
       .config(
         "spark.mongodb.read.connection.uri",
@@ -28,12 +30,16 @@ object Comparison {
 
     val sc = spark.sparkContext
 
+    def trimText(text: String): String = {
+      if (text.length > 50) text.take(50 - 3) + "..." else text
+    }
+
     def formatTime(nanos: Long): String = f"${nanos / 1e6}%.2f ms"
 
     def formatResults(results: Map[String, List[Int]]): String = {
       results
         .map { case (doc, pos) => s"($doc, [${pos.mkString(", ")}])" }
-        .mkString("\n")
+        .mkString(" ")
     }
 
     // Spark RDD
@@ -44,68 +50,44 @@ object Comparison {
 
     val queries = List(
       "play soccer",
+      "soccer play",
       "play football",
       "play cricket",
       "soccer",
       "Tobias Gregson Shows What He Can Do",
       "Alkali Plain",
       "Avenging Angels",
-      "flourishing distilleries"
+      "flourishing distilleries",
+      "who was usually very late in the mornings",
+      "mornings who was usually very late in the",
+      "The first thing that put us out was that advertisement",
+      "Penang lawyer",
+      "Your experience has been a most entertaining one"
     )
-    val headers =
-      Seq("Query", "RDD Time", "Mongo Time", "Mongo Result", "RDD Result")
 
-    val rows = queries.map { query =>
-      val validationResult = isValidWord(query)
-      if (validationResult.isValid) {
+    queries.foreach { query =>
+      val formattedText = formatText(query)
+      println("=====================================")
+      println("=====================================")
+      println("Query: " + trimText(query))
+      if (formattedText.length > 0) {
         val startRDD = System.nanoTime()
-        val rddResults = rddAnalyzer.searchQuery(validationResult.result)
+        val rddResults = rddAnalyzer.searchQuery(formattedText)
         val rddTime = System.nanoTime() - startRDD
 
         val startMongo = System.nanoTime()
-        val mongoResults = mongoAnalyze.searchQuery(validationResult.result)
+        val mongoResults = mongoAnalyze.searchQuery(formattedText)
         val mongoTime = System.nanoTime() - startMongo
-
-        Seq(
-          validationResult.result,
-          formatTime(rddTime),
-          formatTime(mongoTime),
-          formatResults(mongoResults),
-          formatResults(rddResults)
-        )
+        println("RDD time: " + formatTime(rddTime))
+        println("Mongo time: " + formatTime(mongoTime))
+        println("RDD Result: " + formatResults(rddResults.collect().toMap))
+        println("Mongo Result: " + formatResults(mongoResults))
       } else {
         println("hit invalid qiuery")
-        Seq(query, "N/A", "N/A", "N/A", "N/A")
       }
     }
-
-    println(TableFormatter.formatTable(headers, rows))
 
     // Stop Spark
     spark.stop()
   }
-}
-
-// Table formatter
-object TableFormatter {
-
-  def formatTable(headers: Seq[String], rows: Seq[Seq[String]]): String = {
-    val columnWidths = (headers +: rows).transpose.map(_.map(_.length).max)
-    val border = columnWidths.map("-" * _).mkString("+", "+", "+")
-    val formatRow = (row: Seq[String]) =>
-      row
-        .zip(columnWidths)
-        .map { case (cell, width) =>
-          val trimmedCell =
-            if (cell.length > 30) cell.take(20) + "..." else cell
-          trimmedCell.padTo(width, ' ')
-        }
-        .mkString("|", "|", "|")
-
-    val formattedTable =
-      (Seq(border, formatRow(headers), border) ++ rows.map(formatRow) :+ border)
-        .mkString("\n")
-    formattedTable
-  }
-
 }

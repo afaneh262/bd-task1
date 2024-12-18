@@ -4,16 +4,22 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.rdd.RDD
 import org.apache.log4j._
 import org.apache.log4j.varia.NullAppender
+import TextUtils._
 
 import org.apache.log4j.{Level, Logger}
-import TextUtils._
 
 object Main {
   def main(args: Array[String]): Unit = {
+    println("Start...")
     val nullAppender = new NullAppender
     BasicConfigurator.configure(nullAppender)
 
-    Logger.getRootLogger.setLevel(Level.ERROR)
+    Logger.getLogger("org").setLevel(Level.WARN)
+    Logger.getLogger("akka").setLevel(Level.WARN)
+    Logger.getRootLogger.setLevel(
+      Level.ERROR
+    )
+    Logger.getRootLogger.setLevel(Level.OFF)
 
     // Initialize Spark Session
     val spark = SparkSession
@@ -43,12 +49,7 @@ object Main {
         .flatMap { case (docPath, content) =>
           val docName = docPath.split("/").last
           content.split("\\s+").zipWithIndex.collect { case (word, pos) =>
-            val validationResult = isValidWord(word)
-            if (validationResult.isValid) {
-              Some((validationResult.result, (docName, pos)))
-            } else {
-              None
-            }
+            Some((formatText(word), (docName, pos)))
           }
         }
         .flatMap(x => x)
@@ -78,6 +79,7 @@ object Main {
     val mongodbAnalyzer = new MongodbAnalyzer(spark)
     mongodbAnalyzer.processAndSave(invertedIndex)
 
+    println("End...")
     // Stop Spark
     spark.stop()
   }

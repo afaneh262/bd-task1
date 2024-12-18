@@ -14,95 +14,94 @@ case class WordOccurrence(
 )
 
 class RddTextAnalyzer(inputRDD: RDD[String]) {
-  private val wordMap: Map[String, WordOccurrence] = parseInput(inputRDD)
+  private val wordOccurrencesRDD: RDD[(String, WordOccurrence)] = parseInput(inputRDD)
+  
+  private def parseInput(rdd: RDD[String]): RDD[(String, WordOccurrence)] = {
+    rdd.map { line =>
+      val mainParts: Array[String] = line.split(",", 3).map(_.trim)
+      val word: String = mainParts(0)
+      val count: Int = mainParts(1).toInt
 
-  private def parseInput(rdd: RDD[String]): Map[String, WordOccurrence] = {
-    val wordOccurrences: Array[(String, WordOccurrence)] = rdd
-      .map { line =>
-        val mainParts: Array[String] = line.split(",", 3).map(_.trim)
-        val word: String = mainParts(0)
-        val count: Int = mainParts(1).toInt
+      val positionRegex = """\(([^,]+),\s*\[([\d,\s]+)\]\)""".r
+      val matches = positionRegex.findAllMatchIn(mainParts(2))
 
-        val positionRegex = """\(([^,]+),\s*\[([\d,\s]+)\]\)""".r
-        val matches = positionRegex.findAllMatchIn(mainParts(2))
+      val positions: List[Position] = matches.map { matchResult =>
+        val documentName: String = matchResult.group(1).trim.replace("\"", "")
+        val positionNumbers: List[Int] = matchResult
+          .group(2)
+          .split(",")
+          .map(pos => pos.trim.toInt)
+          .toList
 
-        val positions: List[Position] = matches.map { matchResult =>
-          val documentName: String = matchResult.group(1).trim.replace("\"", "")
-          val positionNumbers: List[Int] = matchResult
-            .group(2)
-            .split(",")
-            .map(pos => pos.trim.toInt)
-            .toList
+        Position(documentName, positionNumbers)
+      }.toList
 
-          Position(documentName, positionNumbers)
-        }.toList
-
-        (word, WordOccurrence(word, count, positions))
-      }
-      .collect()
-
-    wordOccurrences.toMap
+      (word, WordOccurrence(word, count, positions))
+    }
   }
 
-  def searchQuery(searchPhrase: String): Map[String, List[Int]] = {
-    val wordsToFind: Array[String] =
+  def searchQuery(searchPhrase: String): RDD[(String, List[Int])] = {
+    val wordsToFind: Array[String] = 
       searchPhrase.split(" ").map(_.trim).filter(_.nonEmpty)
 
-    val allWordsExist: Boolean =
-      wordsToFind.forall(word => wordMap.contains(word))
-      
-    if (wordsToFind.isEmpty || !allWordsExist) {
-      return Map.empty[String, List[Int]]
+    if (wordsToFind.isEmpty) {
+      return inputRDD.context.emptyRDD[(String, List[Int])]
+    }
+
+    val wordExists = wordOccurrencesRDD
+      .filter(entry => wordsToFind.contains(entry._1))
+      .keys
+      .collect()
+      .toSet
+
+    if (!wordsToFind.forall(wordExists.contains)) {
+      return inputRDD.context.emptyRDD[(String, List[Int])]
     }
 
     if (wordsToFind.length == 1) {
-      val word = wordsToFind(0)
-      return wordMap(word).occurrences.map { position =>
-        position.documentName -> position.positions
-      }.toMap
+      return wordOccurrencesRDD
+        .filter(_._1 == wordsToFind(0))
+        .flatMap { case (_, wordOcc) =>
+          wordOcc.occurrences.map(pos => (pos.documentName, pos.positions))
+        }
     }
 
-    val result = scala.collection.mutable.Map[String, List[Int]]()
-
-    val wordPositions: List[List[Position]] = wordsToFind
-      .map(word => wordMap(word).occurrences)
-      .toList
-
-    val documentsWithAllWords: List[String] = {
-      val allDocumentNames: List[List[String]] = wordPositions.map {
-        positions =>
-          positions.map(pos => pos.documentName)
+    val wordPositionsRDD: RDD[(String, (String, List[Int]))] = wordOccurrencesRDD
+      .filter(entry => wordsToFind.contains(entry._1))
+      .flatMap { case (word, wordOcc) =>
+        wordOcc.occurrences.map(pos => 
+          (pos.documentName, (word, pos.positions))
+        )
       }
-      allDocumentNames.reduce { (doc1, doc2) =>
-        doc1.intersect(doc2)
-      }
-    }
 
-    for (documentName <- documentsWithAllWords) {
-      val positionsPerWord: Array[List[Int]] = wordsToFind.map { word =>
-        val positionForDoc: Option[Position] = wordMap(word).occurrences
-          .find(pos => pos.documentName == documentName)
+    val documentGroupedRDD: RDD[(String, Iterable[(String, List[Int])])] = 
+      wordPositionsRDD.groupByKey()
 
-        positionForDoc match {
-          case Some(position) => position.positions
-          case None           => List.empty[Int]
+    documentGroupedRDD
+      .flatMap { case (documentName, wordPositions) =>
+        val positionsMap = wordPositions.toMap
+        
+        if (wordsToFind.forall(positionsMap.contains)) {
+          val startPositions = positionsMap(wordsToFind(0))
+          
+          val consecutivePositions = startPositions.filter { startPos =>
+            val hasAllConsecutiveWords = (1 until wordsToFind.length).forall { wordIndex =>
+              positionsMap.get(wordsToFind(wordIndex)) match {
+                case Some(positions) => positions.contains(startPos + wordIndex)
+                case None => false
+              }
+            }
+            hasAllConsecutiveWords
+          }
+
+          if (consecutivePositions.nonEmpty) {
+            Some((documentName, consecutivePositions))
+          } else {
+            None
+          }
+        } else {
+          None
         }
       }
-
-      val consecutivePositions: List[Int] = positionsPerWord(0).filter {
-        startPos =>
-          val hasAllConsecutiveWords: Boolean =
-            (1 until wordsToFind.length).forall { wordIndex =>
-              positionsPerWord(wordIndex).contains(startPos + wordIndex)
-            }
-          hasAllConsecutiveWords
-      }
-
-      if (consecutivePositions.nonEmpty) {
-        result(documentName) = consecutivePositions
-      }
-    }
-
-    result.toMap
   }
 }
