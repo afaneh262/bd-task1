@@ -13,8 +13,6 @@ class MongodbAnalyzer(
   def processAndSave(
       invertedIndexRDD: RDD[(String, (Int, List[(String, List[Int])]))]
   ): Unit = {
-    println("processAndSave start")
-
     val postingSchema = StructType(
       Seq(
         StructField("docId", StringType, false),
@@ -53,39 +51,25 @@ class MongodbAnalyzer(
       .option("database", "wholeInvertedIndex")
       .option("collection", "words")
       .save()
-
-    println("processAndSave end")
   }
 
   def searchQuery(searchPhrase: String): Map[String, List[Int]] = {
-    val searchTerms = searchPhrase.toLowerCase.split("\\s+").toSet
+    val searchTerms = searchPhrase.split(" ").map(_.trim).filter(_.nonEmpty)
+    val searchTermsArray = searchTerms.mkString("[\"", "\", \"", "\"]")
 
     val wordsDF = spark.read
       .format("mongodb")
       .option("database", "wholeInvertedIndex")
       .option("collection", "words")
+      .option(
+        "pipeline",
+        s"""[{ "$$match": { "_id": { "$$in": $searchTermsArray } } }]"""
+      )
       .load()
-      .filter(col("_id").isin(searchTerms.toSeq: _*))
-
+      
     case class Posting(docId: String, positions: Seq[Int]) extends Serializable
     case class WordDoc(_id: String, docFrequency: Long, postings: Seq[Posting])
         extends Serializable
-
-    def findConsecutiveMatches(
-        wordPositions: Map[String, Seq[Int]],
-        searchTerms: Seq[String]
-    ): Seq[Int] = {
-      val firstWordPositions = wordPositions(searchTerms.head).toSet
-
-      firstWordPositions
-        .filter { startPos =>
-          searchTerms.zipWithIndex.forall { case (word, idx) =>
-            wordPositions(word).contains(startPos + idx)
-          }
-        }
-        .toSeq
-        .sorted
-    }
 
     if (searchTerms.size == 1) {
       wordsDF
@@ -99,8 +83,7 @@ class MongodbAnalyzer(
           }
         }
         .toMap
-    }
-    else {
+    } else {
       val results = wordsDF.collect().flatMap { row =>
         val word = row.getString(row.fieldIndex("_id"))
         val postings = row.getSeq[Row](row.fieldIndex("postings"))
@@ -116,8 +99,19 @@ class MongodbAnalyzer(
           (word, positions)
         }.toMap
 
-        if (wordPositions.keySet == searchTerms) {
-          val matches = findConsecutiveMatches(wordPositions, searchTerms.toSeq)
+        if (wordPositions.keySet == searchTerms.toSet) {
+          val firstWordPositions = wordPositions(searchTerms.head).toSet
+          val matches = firstWordPositions
+            .filter { startPos =>
+              searchTerms.zipWithIndex.forall {
+                case (word, idx) => {
+                  wordPositions(word).contains(startPos + idx)
+                }
+              }
+            }
+            .toSeq
+            .sorted
+
           if (matches.nonEmpty) {
             Some(docId -> matches.toList)
           } else {

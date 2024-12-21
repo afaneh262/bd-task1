@@ -1,0 +1,99 @@
+=====================================
+=====================================
+Query: play soccer
+RDD time: 848.92 ms
+Mongo time: 3246.32 ms
+RDD Result: (houn.txt, [116]) (big.txt, [10574])
+Mongo Result: (big.txt, [10574]) (houn.txt, [116])
+=====================================
+=====================================
+Query: soccer play
+RDD time: 221.12 ms
+Mongo time: 366.73 ms
+RDD Result: 
+Mongo Result: 
+=====================================
+=====================================
+Query: play football
+RDD time: 279.03 ms
+Mongo time: 386.69 ms
+RDD Result: 
+Mongo Result: 
+=====================================
+=====================================
+Query: play cricket
+RDD time: 254.11 ms
+Mongo time: 507.29 ms
+RDD Result: 
+Mongo Result: 
+=====================================
+=====================================
+Query: soccer
+RDD time: 203.11 ms
+Mongo time: 532.09 ms
+RDD Result: (big.txt, [10575, 1084380]) (houn.txt, [117])
+Mongo Result: (big.txt, [10575, 1084380]) (houn.txt, [117])
+=====================================
+=====================================
+Query: Tobias Gregson Shows What He Can Do
+RDD time: 186.18 ms
+Mongo time: 491.28 ms
+RDD Result: 
+Mongo Result: 
+=====================================
+=====================================
+Query: Alkali Plain
+RDD time: 148.86 ms
+Mongo time: 410.69 ms
+RDD Result: 
+Mongo Result: 
+=====================================
+=====================================
+Query: Avenging Angels
+RDD time: 143.10 ms
+Mongo time: 290.42 ms
+RDD Result: 
+Mongo Result: 
+=====================================
+=====================================
+Query: flourishing distilleries
+RDD time: 156.56 ms
+Mongo time: 453.84 ms
+RDD Result: (big.txt, [118850])
+Mongo Result: (big.txt, [118850])
+=====================================
+=====================================
+Query: who was usually very late in the mornings
+RDD time: 257.64 ms
+Mongo time: 3621.01 ms
+RDD Result: (houn.txt, [3])
+Mongo Result: (houn.txt, [3])
+=====================================
+=====================================
+Query: mornings who was usually very late in the
+RDD time: 160.74 ms
+Mongo time: 546.04 ms
+RDD Result: 
+Mongo Result: 
+=====================================
+=====================================
+Query: The first thing that put us out was that advert...
+
+RDD time: 181.86 ms
+Mongo time: 256807.42 ms
+RDD Result: (big.txt, [10542])
+Mongo Result: (big.txt, [10542])
+=====================================
+=====================================
+Query: Penang lawyer
+RDD time: 188.50 ms
+Mongo time: 518.30 ms
+RDD Result: (houn.txt, [66])
+Mongo Result: (houn.txt, [66])
+=====================================
+=====================================
+Query: Your experience has been a most entertaining one
+RDD time: 249.26 ms
+Mongo time: 541.90 ms
+RDD Result: (big.txt, [11399])
+Mongo Result: (big.txt, [11399])
